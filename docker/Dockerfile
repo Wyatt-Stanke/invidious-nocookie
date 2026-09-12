@@ -41,8 +41,9 @@ COPY ./.git/ ./.git/
 COPY ./scripts/ ./scripts/
 COPY ./assets/ ./assets/
 
-RUN crystal spec --warnings all \
-    --link-flags "-lxml2 -llzma"
+# NOTE: the spec suite is not run here on purpose. It needs the `mocks`
+# submodule, and deploy builds (e.g. Coolify) should not depend on it.
+# Run `crystal spec` locally or in CI instead.
 
 ARG OPENSSL_VERSION
 COPY --from=openssl-builder /openssl-${OPENSSL_VERSION} /openssl-${OPENSSL_VERSION}

@@ -1,0 +1,102 @@
+# Self-contained compose file for deploying this fork on Coolify.
+#
+# Differences from the upstream docker-compose.yml:
+#   - no bind mounts: `check_tables: true` makes Invidious create its own
+#     tables, so the SQL init script is not needed
+#   - no `ports:`; Coolify's proxy routes to the `expose`d port of the
+#     service you attach a domain to (invidious, port 3000)
+#   - secrets come from Coolify "magic" variables (SERVICE_PASSWORD_*), which
+#     Coolify generates on first deploy and shows in the Environment tab
+#   - INVIDIOUS_DOMAIN is the one value you must fill in yourself
+#
+# Deploy this repo in Coolify as a "Docker Compose" resource backed by the
+# git repository, with "Docker Compose Location" set to
+# /docker-compose.coolify.yml. Coolify then builds the image from
+# docker/Dockerfile on the server itself. The upstream quay.io image is not
+# usable because it still contains the video proxy.
+#
+# The build is a static Crystal release build and also compiles OpenSSL, so
+# the server needs a few GB of free RAM while building.
+
+services:
+  invidious:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        release: 1
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      INVIDIOUS_CONFIG: |
+        db:
+          dbname: invidious
+          user: kemal
+          password: ${SERVICE_PASSWORD_POSTGRES}
+          host: invidious-db
+          port: 5432
+        check_tables: true
+        domain: ${INVIDIOUS_DOMAIN}
+        https_only: true
+        hmac_key: ${SERVICE_PASSWORD_64_HMAC}
+        invidious_companion:
+          - private_url: "http://companion:8282/companion"
+        invidious_companion_key: ${SERVICE_PASSWORD_64_COMPANION}
+        # Comment these in if you want a public instance to opt in/out:
+        # registration_enabled: false
+        # login_enabled: false
+        # statistics_enabled: false
+    healthcheck:
+      test: wget -nv --tries=1 --spider http://127.0.0.1:3000/api/v1/stats || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 2
+    logging:
+      options:
+        max-size: "100m"
+        max-file: "4"
+    depends_on:
+      invidious-db:
+        condition: service_healthy
+      companion:
+        condition: service_started
+
+  # Still required: this fork only ever asks the companion for the
+  # /youtubei/v1/player *metadata* (title, description, captions, etc).
+  # No media is requested through it, so its bandwidth use is negligible.
+  companion:
+    image: quay.io/invidious/invidious-companion:latest
+    restart: unless-stopped
+    environment:
+      - SERVER_SECRET_KEY=${SERVICE_PASSWORD_64_COMPANION}
+    logging:
+      options:
+        max-size: "100m"
+        max-file: "4"
+    cap_drop:
+      - ALL
+    read_only: true
+    volumes:
+      - companioncache:/var/tmp/youtubei.js:rw
+    security_opt:
+      - no-new-privileges:true
+
+  invidious-db:
+    image: docker.io/library/postgres:14
+    restart: unless-stopped
+    volumes:
+      - postgresdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: invidious
+      POSTGRES_USER: kemal
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgresdata:
+  companioncache:
