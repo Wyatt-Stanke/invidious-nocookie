@@ -155,7 +155,7 @@ module Invidious::Videos::Parser
     reason ||= subreason.try &.[]?("runs").try &.as_a.map(&.[]("text")).join("")
     reason ||= player_response.dig?("playabilityStatus", "reason").try &.as_s || ""
 
-    if playability_status == "LOGIN_REQUIRED" && !has_details && BOT_CHECK_REASONS.any? { |r| reason.downcase.includes?(r) }
+    if BOT_CHECK_REASONS.any? { |r| reason.downcase.includes?(r) }
       LOGGER.info("extract_video_info: [#{video_id}] player response is bot-checked, using /next data only")
       return {nil, nil}
     end
