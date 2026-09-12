@@ -9,27 +9,19 @@
 #     Coolify generates on first deploy and shows in the Environment tab
 #   - INVIDIOUS_DOMAIN is the one value you must fill in yourself
 #
-# Deploy this repo in Coolify as a "Docker Compose" resource backed by the
-# git repository, with "Docker Compose Location" set to
-# /docker-compose.coolify.yml. Coolify then builds the image from
-# docker/Dockerfile on the server itself. The upstream quay.io image is not
-# usable because it still contains the video proxy.
+# The image is built by .github/workflows/build-container.yml on every push
+# to master and published to GHCR, so nothing is compiled on the server.
+# (Building on the server is possible but needs several GB of RAM.)
 #
-# The build is a static Crystal release build and also compiles OpenSSL, so
-# the server needs a few GB of free RAM while building.
+# In Coolify, create a "Docker Compose Empty" resource and paste this file,
+# or use this repo as a "Docker Compose" git resource pointing at
+# /docker-compose.coolify.yml. Either way Coolify only pulls the image.
+# If the GHCR package is private, add GHCR credentials to Coolify first.
 
 services:
   invidious:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        release: 1
-        # Coolify exports COOLIFY_BRANCH to the build; the commit is not
-        # exported by default, so it shows as "unknown" unless you add a
-        # SOURCE_COMMIT variable yourself.
-        INVIDIOUS_BRANCH: ${COOLIFY_BRANCH:-}
-        INVIDIOUS_COMMIT: ${SOURCE_COMMIT:-}
+    image: ghcr.io/wyatt-stanke/invidious-nocookie:latest
+    pull_policy: always
     restart: unless-stopped
     expose:
       - "3000"
