@@ -33,9 +33,15 @@ COPY ./shard.lock ./shard.lock
 RUN shards install --production
 
 COPY ./src/ ./src/
-# TODO: .git folder is required for building – this is destructive.
-# See definition of CURRENT_BRANCH, CURRENT_COMMIT and CURRENT_VERSION.
-COPY ./.git/ ./.git/
+
+# Build metadata shown on /api/v1/stats. No .git directory is needed in the
+# build context (Coolify, for example, strips it); pass these as build args.
+# INVIDIOUS_VERSION defaults to the build date when not given.
+ARG INVIDIOUS_BRANCH=""
+ARG INVIDIOUS_COMMIT=""
+ARG INVIDIOUS_VERSION=""
+ENV INVIDIOUS_BRANCH=$INVIDIOUS_BRANCH \
+    INVIDIOUS_COMMIT=$INVIDIOUS_COMMIT
 
 # Required for generating the JS licenses page at compile time
 COPY ./scripts/ ./scripts/
@@ -60,7 +66,9 @@ COPY --from=openssl-builder /openssl-${OPENSSL_VERSION} /openssl-${OPENSSL_VERSI
 # - https://github.com/84codes/crystal-packages/issues/41
 #
 # `-no-pie` can be removed once it's fixed.
-RUN --mount=type=cache,target=/root/.cache/crystal if [[ "${release}" == 1 ]] ; then \
+RUN --mount=type=cache,target=/root/.cache/crystal \
+    export INVIDIOUS_VERSION="${INVIDIOUS_VERSION:-$(date -u +%Y.%m.%d)}"; \
+    if [[ "${release}" == 1 ]] ; then \
         PKG_CONFIG_PATH=/openssl-${OPENSSL_VERSION} \
         crystal build ./src/invidious.cr \
         --release \

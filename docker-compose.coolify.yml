@@ -25,6 +25,11 @@ services:
       dockerfile: docker/Dockerfile
       args:
         release: 1
+        # Coolify exports COOLIFY_BRANCH to the build; the commit is not
+        # exported by default, so it shows as "unknown" unless you add a
+        # SOURCE_COMMIT variable yourself.
+        INVIDIOUS_BRANCH: ${COOLIFY_BRANCH:-}
+        INVIDIOUS_COMMIT: ${SOURCE_COMMIT:-}
     restart: unless-stopped
     expose:
       - "3000"

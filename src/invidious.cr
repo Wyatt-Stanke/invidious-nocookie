@@ -70,15 +70,23 @@ end
 HOST_URL           = make_host_url(Kemal.config)
 MAX_ITEMS_PER_PAGE = 1500
 
-CURRENT_BRANCH  = {{ "#{`git branch | sed -n '/* /s///p'`.strip}" }}
-CURRENT_COMMIT  = {{ "#{`git rev-list HEAD --max-count=1 --abbrev-commit`.strip}" }}
-CURRENT_VERSION = {{ "#{`git log -1 --format=%ci | awk '{print $1}' | sed s/-/./g`.strip}" }}
-CURRENT_TAG     = {{ "#{`git tag --points-at HEAD`.strip}" }}
+# Build metadata. Taken from the INVIDIOUS_BRANCH / INVIDIOUS_COMMIT /
+# INVIDIOUS_VERSION environment variables when set at compile time (used by
+# container builds, where no .git directory is available), otherwise from git.
+# The `|| true` keeps the compiler from aborting when git is unavailable.
+CURRENT_BRANCH  = ({{ env("INVIDIOUS_BRANCH") || "#{`git branch 2>/dev/null | sed -n '/* /s///p' || true`.strip}" }}).presence || "unknown"
+CURRENT_COMMIT  = ({{ env("INVIDIOUS_COMMIT") || "#{`git rev-list HEAD --max-count=1 --abbrev-commit 2>/dev/null || true`.strip}" }}).presence || "unknown"
+CURRENT_VERSION = ({{ env("INVIDIOUS_VERSION") || "#{`git log -1 --format=%ci 2>/dev/null | awk '{print $1}' | sed s/-/./g || true`.strip}" }}).presence || "unknown"
+CURRENT_TAG     = {{ "#{`git tag --points-at HEAD 2>/dev/null || true`.strip}" }}
 
 # This is used to determine the `?v=` on the end of file URLs (for cache busting). We
 # only need to expire modified assets, so we can use this to find the last commit that changes
 # any assets
-ASSET_COMMIT = {{ "#{`git rev-list HEAD --max-count=1 --abbrev-commit -- assets`.strip}" }}
+# Cache-busting token for static assets. Falls back to the commit passed in
+# via INVIDIOUS_COMMIT, then to the build time, when git is unavailable.
+ASSET_COMMIT = ({{ "#{`git rev-list HEAD --max-count=1 --abbrev-commit -- assets 2>/dev/null || true`.strip}" }}).presence ||
+               ({{ env("INVIDIOUS_COMMIT") || "" }}).presence ||
+               {{ "#{`date -u +%s`.strip}" }}
 
 SOFTWARE = {
   "name"    => "invidious",
