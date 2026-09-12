@@ -5,9 +5,14 @@
 #     tables, so the SQL init script is not needed
 #   - no `ports:`; Coolify's proxy routes to the `expose`d port of the
 #     service you attach a domain to (invidious, port 3000)
-#   - secrets come from Coolify "magic" variables (SERVICE_PASSWORD_*), which
-#     Coolify generates on first deploy and shows in the Environment tab
-#   - INVIDIOUS_DOMAIN is the one value you must fill in yourself
+#   - the database password and HMAC key come from Coolify "magic" variables
+#     (SERVICE_PASSWORD_*), which Coolify generates on first deploy
+#   - two values must be filled in by hand in the Environment tab:
+#       INVIDIOUS_DOMAIN        bare hostname of the instance
+#       COMPANION_SECRET_KEY    must be EXACTLY 16 characters (both Invidious
+#                               and the companion refuse any other length);
+#                               generate with `pwgen 16 1` or
+#                               `openssl rand -hex 8`
 #
 # The image is built by .github/workflows/build-container.yml on every push
 # to master and published to GHCR, so nothing is compiled on the server.
@@ -39,7 +44,7 @@ services:
         hmac_key: ${SERVICE_PASSWORD_64_HMAC}
         invidious_companion:
           - private_url: "http://companion:8282/companion"
-        invidious_companion_key: ${SERVICE_PASSWORD_64_COMPANION}
+        invidious_companion_key: ${COMPANION_SECRET_KEY}
         # Comment these in if you want a public instance to opt in/out:
         # registration_enabled: false
         # login_enabled: false
@@ -66,7 +71,7 @@ services:
     image: quay.io/invidious/invidious-companion:latest
     restart: unless-stopped
     environment:
-      - SERVER_SECRET_KEY=${SERVICE_PASSWORD_64_COMPANION}
+      - SERVER_SECRET_KEY=${COMPANION_SECRET_KEY}
     logging:
       options:
         max-size: "100m"
