@@ -13,8 +13,8 @@
 #                               and the companion refuse any other length);
 #                               generate with `pwgen 16 1` or
 #                               `openssl rand -hex 8`
-#   - optionally COMPANION_PROXY, a proxy URL for the companion's YouTube
-#     requests (see the companion service below)
+#   - optionally, the companion service's own PROXY variable (a proxy URL for
+#     its YouTube requests), which Coolify lists as "PROXY [companion]"
 #
 # The image is built by .github/workflows/build-container.yml on every push
 # to master and published to GHCR, so nothing is compiled on the server.
@@ -75,9 +75,9 @@ services:
     environment:
       - SERVER_SECRET_KEY=${COMPANION_SECRET_KEY}
       # Optional outbound proxy for the companion's requests to YouTube,
-      # e.g. http://user:pass@host:port. Leave COMPANION_PROXY unset to
-      # connect directly.
-      - PROXY=${COMPANION_PROXY:-}
+      # e.g. http://user:pass@host:port. Set it on this service's PROXY
+      # variable in Coolify's Environment tab; empty means no proxy.
+      - PROXY=
     logging:
       options:
         max-size: "100m"
