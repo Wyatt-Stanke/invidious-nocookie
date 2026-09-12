@@ -82,6 +82,49 @@ Spectator.describe "parse_video_info" do
     expect(info["subCountText"].as_s).to eq("320M")
   end
 
+  it "parses a regular video without a player response" do
+    # Only the /next response is available when Invidious companion is
+    # absent or the player endpoint is bot-checked.
+    _next = load_mock("video/regular_mrbeast.next")
+
+    info = Invidious::Videos::Parser.parse_video_info("2isYuQZMbdU", _next)
+
+    expect(info["videoType"].as_s).to eq("Video")
+
+    # Basic infos, now sourced from /next
+    expect(info["title"].as_s).to eq("I Gave My 100,000,000th Subscriber An Island")
+    expect(info["views"].as_i).to eq(220_226_287)
+    expect(info["likes"].as_i).to eq(6_870_691)
+    expect(info["published"].as_s).to eq("2022-08-04T00:00:00Z")
+
+    # Unknown without the player response
+    expect(info["lengthSeconds"].as_i).to eq(0)
+    expect(info["allowedRegions"].as_a).to be_empty
+    expect(info["keywords"].as_a).to be_empty
+
+    # Sensible defaults when unknown
+    expect(info["allowRatings"].as_bool).to be_true
+    expect(info["isFamilyFriendly"].as_bool).to be_true
+    expect(info["isListed"].as_bool).to be_true
+    expect(info["isUpcoming"].as_bool).to be_false
+    expect(info["isPostLiveDvr"].as_bool).to be_false
+
+    # Author infos, now sourced from the owner renderer
+    expect(info["author"].as_s).to eq("MrBeast")
+    expect(info["ucid"].as_s).to eq("UCX6OQ3DkcsbYNE6H8uQQuVA")
+    expect(info["authorVerified"].as_bool).to be_true
+    expect(info["subCountText"].as_s).to eq("320M")
+
+    # Description, from attributedDescription
+    expect(info["description"].as_s).to start_with("🚀Launch a store on Shopify")
+    expect(info["shortDescription"].as_s).to start_with("🚀Launch a store on Shopify")
+    expect(info["descriptionHtml"].as_s).to start_with("🚀Launch a store on Shopify")
+
+    # Still there
+    expect(info["relatedVideos"].as_a.size).to eq(20)
+    expect(info["commentsEnabled"].as_bool).to be_true
+  end
+
   it "parses a regular video with no descrition/comments" do
     # Enable mock
     _player = load_mock("video/regular_no-description.player")

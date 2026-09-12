@@ -202,7 +202,7 @@ we're going to need to do it here in order to allow for translations.
             <p id="wilson" style="display: none; visibility: hidden;"></p>
             <p id="rating" style="display: none; visibility: hidden;"></p>
             <p id="engagement" style="display: none; visibility: hidden;"></p>
-            <% if video.allowed_regions.size != REGIONS.size %>
+            <% if !video.allowed_regions.empty? && video.allowed_regions.size != REGIONS.size %>
                 <p id="allowed_regions">
                     <% if video.allowed_regions.size < REGIONS.size // 2 %>
                         <%= I18n.translate(locale, "Whitelisted regions: ") %><%= video.allowed_regions.join(", ") %>

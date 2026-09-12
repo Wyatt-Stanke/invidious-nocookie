@@ -51,6 +51,13 @@ db:
 ## Invidious companion is an external program
 ## for loading the video streams from YouTube servers.
 ##
+## NOTE: in this fork the companion is OPTIONAL. Playback happens in an
+## embedded youtube-nocookie.com player and all watch page metadata comes
+## from YouTube's /next endpoint, which needs no PO token. When configured,
+## the companion's player response only adds extras (exact length, caption
+## list, region flags, stream URLs in the JSON API) and is ignored whenever
+## YouTube answers it with a bot check.
+##
 ## When this setting is commented out, Invidious companion is not used.
 ## Otherwise, Invidious will proxy the requests to Invidious companion.
 ##

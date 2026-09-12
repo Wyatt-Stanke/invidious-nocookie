@@ -15,7 +15,7 @@ struct Video
   # NOTE: don't forget to bump this number if any change is made to
   # the `params` structure in videos/parser.cr!!!
   #
-  SCHEMA_VERSION = 3
+  SCHEMA_VERSION = 4
 
   property id : String
 
@@ -77,7 +77,7 @@ struct Video
   end
 
   def post_live_dvr
-    return info["isPostLiveDvr"].as_bool
+    return info["isPostLiveDvr"]?.try &.as_bool || false
   end
 
   def premiere_timestamp : Time?
@@ -332,22 +332,15 @@ end
 def fetch_video(id, region)
   info = Invidious::Videos::Parser.extract_video_info(video_id: id)
 
-  if info.nil?
-    raise InfoException.new("Invidious companion is not available. \
-    Video playback cannot continue. \
-    If you are the administrator of this instance, install Invidious companion \
-    following the installation instructions \
-    <a href=\"https://docs.invidious.io/installation/\">https://docs.invidious.io/installation/</a>")
-  end
-
   if reason = info["reason"]?
     if reason == "Video unavailable"
       raise NotFoundException.new(reason.as_s || "")
-    elsif !reason.as_s.starts_with? "Premieres"
-      # dont error when it's a premiere.
-      # we already parsed most of the data and display the premiere date
+    elsif info["title"]?.nil?
+      # Nothing could be extracted at all
       raise InfoException.new(reason.as_s || "")
     end
+    # Otherwise keep going: the reason is shown on the watch page, and the
+    # embedded player displays YouTube's own message as well.
   end
 
   video = Video.new({

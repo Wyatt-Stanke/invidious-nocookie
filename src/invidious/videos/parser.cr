@@ -55,66 +55,42 @@ module Invidious::Videos::Parser
     }
   end
 
+  # Bot-check / sign-in wall reasons returned by the player endpoint. These
+  # only affect stream playback, which this fork delegates to YouTube's own
+  # embed, so they must never make a watch page fail.
+  private BOT_CHECK_REASONS = {"not a bot"}
+
   def extract_video_info(video_id : String)
-    # Fetch data from the player endpoint
-    player_response = YoutubeAPI.player(video_id: video_id)
+    # In this fork the `/next` endpoint is the primary source of metadata.
+    # It is not gated behind PO tokens or bot checks, unlike `/player`.
+    next_response = YoutubeAPI.next({"videoId": video_id, "params": ""})
+    # Remove the microformat returned by the /next endpoint on some videos
+    # to prevent player_response microformat from being overwritten.
+    next_response.delete("microformat")
 
-    if player_response.nil?
-      return nil
-    end
+    # The player response is optional enrichment (length, captions,
+    # storyboards, region flags, stream URLs for the API). It needs
+    # Invidious companion and a YouTube session that is not bot-checked.
+    player_response, reason = self.fetch_player_response(video_id)
 
-    playability_status = player_response.dig?("playabilityStatus", "status").try &.as_s
-
-    if playability_status != "OK"
-      subreason = player_response.dig?("playabilityStatus", "errorScreen", "playerErrorMessageRenderer", "subreason")
-      reason = subreason.try &.[]?("simpleText").try &.as_s
-      reason ||= subreason.try &.[]("runs").as_a.map(&.[]("text")).join("")
-      reason ||= player_response.dig("playabilityStatus", "reason").as_s
-
-      # Stop here if video is not a scheduled livestream or
-      # for LOGIN_REQUIRED when videoDetails element is not found because retrying won't help
-      if !{"LIVE_STREAM_OFFLINE", "LOGIN_REQUIRED"}.any?(playability_status) ||
-         playability_status == "LOGIN_REQUIRED" && !player_response.dig?("videoDetails")
-        return {
-          "version" => JSON::Any.new(Video::SCHEMA_VERSION.to_i64),
-          "reason"  => JSON::Any.new(reason),
-        }
-      end
-    elsif video_id != player_response.dig?("videoDetails", "videoId")
-      # YouTube may return a different video player response than expected.
-      # See: https://github.com/TeamNewPipe/NewPipe/issues/8713
-      # Line to be reverted if one day we solve the video not available issue.
-
-      # Although technically not a call to /videoplayback the fact that YouTube is returning the
-      # wrong video means that we should count it as a failure.
-      Helpers.get_playback_statistic["totalRequests"] += 1
-
+    if !self.next_has_video?(next_response) && player_response.nil?
       return {
         "version" => JSON::Any.new(Video::SCHEMA_VERSION.to_i64),
-        "reason"  => JSON::Any.new("Can't load the video on this Invidious instance. YouTube is currently trying to block Invidious instances. <a href=\"https://github.com/iv-org/invidious/issues/3822\">Click here for more info about the issue.</a>"),
+        "reason"  => JSON::Any.new(reason || "Video unavailable"),
       }
-    else
-      reason = nil
     end
 
-    # Don't fetch the next endpoint if the video is unavailable.
-    if {"OK", "LIVE_STREAM_OFFLINE", "LOGIN_REQUIRED"}.any?(playability_status)
-      next_response = YoutubeAPI.next({"videoId": video_id, "params": ""})
-      # Remove the microformat returned by the /next endpoint on some videos
-      # to prevent player_response microformat from being overwritten.
-      next_response.delete("microformat")
-      player_response = player_response.merge(next_response)
-    end
+    merged = player_response ? player_response.merge(next_response) : next_response
 
-    params = self.parse_video_info(video_id, player_response)
+    params = self.parse_video_info(video_id, merged)
     params["reason"] = JSON::Any.new(reason) if reason
 
     {"captions", "playabilityStatus", "playerConfig", "storyboards"}.each do |f|
-      params[f] = player_response[f] if player_response[f]?
+      params[f] = merged[f] if merged[f]?
     end
 
     # Convert URLs, if those are present
-    if streaming_data = player_response["streamingData"]?
+    if streaming_data = merged["streamingData"]?
       %w[formats adaptiveFormats].each do |key|
         streaming_data.as_h[key]?.try &.as_a.each do |format|
           format = format.as_h
@@ -132,6 +108,62 @@ module Invidious::Videos::Parser
     params["version"] = JSON::Any.new(Video::SCHEMA_VERSION.to_i64)
 
     return params
+  end
+
+  # Does the /next response describe an actual video?
+  private def next_has_video?(next_response : Hash(String, JSON::Any)) : Bool
+    contents = next_response.dig?("contents", "twoColumnWatchNextResults", "results", "results", "contents")
+    return true if contents.try &.as_a.any?(&.["videoPrimaryInfoRenderer"]?)
+
+    # Music videos have no primary results, but do have the overlay
+    return !next_response.dig?("playerOverlays", "playerOverlayRenderer", "videoDetails").nil?
+  end
+
+  # Fetch the player response through Invidious companion, when configured.
+  #
+  # Returns the response (or nil when it is unusable) and an optional
+  # human readable reason to display on the watch page.
+  private def fetch_player_response(video_id : String) : {Hash(String, JSON::Any)?, String?}
+    return {nil, nil} if !CONFIG.invidious_companion.present?
+
+    begin
+      player_response = YoutubeAPI.player(video_id: video_id)
+    rescue ex
+      LOGGER.warn("extract_video_info: [#{video_id}] player request failed, using /next data only: #{ex.message}")
+      return {nil, nil}
+    end
+
+    return {nil, nil} if player_response.nil?
+
+    playability_status = player_response.dig?("playabilityStatus", "status").try &.as_s
+    has_details = !player_response.dig?("videoDetails").nil?
+
+    if playability_status == "OK"
+      if video_id != player_response.dig?("videoDetails", "videoId")
+        # YouTube may return a different video player response than expected.
+        # See: https://github.com/TeamNewPipe/NewPipe/issues/8713
+        Helpers.get_playback_statistic["totalRequests"] += 1
+        LOGGER.warn("extract_video_info: [#{video_id}] player returned another video, using /next data only")
+        return {nil, nil}
+      end
+
+      return {player_response, nil}
+    end
+
+    subreason = player_response.dig?("playabilityStatus", "errorScreen", "playerErrorMessageRenderer", "subreason")
+    reason = subreason.try &.[]?("simpleText").try &.as_s
+    reason ||= subreason.try &.[]?("runs").try &.as_a.map(&.[]("text")).join("")
+    reason ||= player_response.dig?("playabilityStatus", "reason").try &.as_s || ""
+
+    if playability_status == "LOGIN_REQUIRED" && !has_details && BOT_CHECK_REASONS.any? { |r| reason.downcase.includes?(r) }
+      LOGGER.info("extract_video_info: [#{video_id}] player response is bot-checked, using /next data only")
+      return {nil, nil}
+    end
+
+    # Any other status (private, removed, region-locked, offline stream,
+    # age-restricted, ...) is worth showing to the user, but must not stop
+    # the page from rendering: the embed shows YouTube's own message too.
+    return {has_details ? player_response : nil, reason.presence}
   end
 
   def try_fetch_streaming_data(id : String, client_config : YoutubeAPI::ClientConfig) : Hash(String, JSON::Any)?
@@ -176,16 +208,22 @@ module Invidious::Videos::Parser
       raise BrokenTubeException.new("videoSecondaryInfoRenderer") if !video_secondary_renderer
     end
 
-    video_details = player_response.dig?("videoDetails")
+    # The player response (videoDetails / microformat) is optional in this
+    # fork. Everything below falls back to the /next response when absent.
+    has_player = !player_response.dig?("videoDetails").nil?
+    video_details = player_response["videoDetails"]? || JSON::Any.new({} of String => JSON::Any)
     if !(microformat = player_response.dig?("microformat", "playerMicroformatRenderer"))
       microformat = {} of String => JSON::Any
     end
 
-    raise BrokenTubeException.new("videoDetails") if !video_details
-
     # Basic video infos
 
     title = video_details["title"]?.try &.as_s
+    title ||= extract_text(video_primary_renderer.try &.["title"]?)
+    title ||= player_response.dig?(
+      "playerOverlays", "playerOverlayRenderer", "videoDetails",
+      "playerOverlayVideoDetailsRenderer", "title"
+    ).try { |t| extract_text(t) }
 
     # We have to try to extract viewCount from videoPrimaryInfoRenderer first,
     # then from videoDetails, as the latter is "0" for livestreams (we want
@@ -197,11 +235,13 @@ module Invidious::Videos::Parser
     views_txt ||= video_details["viewCount"]?.try &.as_s || ""
     views = views_txt.gsub(/\D/, "").to_i64?
 
-    length_txt = (microformat["lengthSeconds"]? || video_details["lengthSeconds"])
+    length_txt = (microformat["lengthSeconds"]? || video_details["lengthSeconds"]?)
       .try &.as_s.to_i64
 
     published = microformat["publishDate"]?
-      .try { |t| Time.parse(t.as_s, "%Y-%m-%d", Time::Location::UTC) } || Time.utc
+      .try { |t| Time.parse(t.as_s, "%Y-%m-%d", Time::Location::UTC) }
+    published ||= parse_date_text(video_primary_renderer.try &.["dateText"]?)
+    published ||= Time.utc
 
     premiere_timestamp = microformat.dig?("liveBroadcastDetails", "startTimestamp")
       .try { |t| Time.parse_rfc3339(t.as_s) }
@@ -216,7 +256,15 @@ module Invidious::Videos::Parser
 
     live_now = microformat.dig?("liveBroadcastDetails", "isLiveNow")
       .try &.as_bool
-    live_now ||= video_details.dig?("isLive").try &.as_bool || false
+    live_now ||= video_details.dig?("isLive").try &.as_bool
+    if !has_player
+      # Only trust the /next flag without player data: it is also set on
+      # scheduled streams that have not started yet.
+      live_now ||= video_primary_renderer
+        .try &.dig?("viewCount", "videoViewCountRenderer", "isLive")
+          .try &.as_bool
+    end
+    live_now ||= false
 
     post_live_dvr = video_details.dig?("isPostLiveDvr")
       .try &.as_bool || false
@@ -230,6 +278,14 @@ module Invidious::Videos::Parser
     family_friendly = microformat["isFamilySafe"]?.try &.as_bool
     is_listed = video_details["isCrawlable"]?.try &.as_bool
     is_upcoming = video_details["isUpcoming"]?.try &.as_bool
+
+    if !has_player
+      # Unknown without player data: assume the common case rather than
+      # flagging every video as unlisted / not family friendly.
+      allow_ratings = true
+      family_friendly = true
+      is_listed = true
+    end
 
     keywords = video_details["keywords"]?
       .try &.as_a.map &.as_s || [] of String
@@ -322,8 +378,14 @@ module Invidious::Videos::Parser
 
     # Description
 
-    description = microformat.dig?("description", "simpleText").try &.as_s || ""
+    description_txt = video_secondary_renderer
+      .try &.dig?("attributedDescription", "content").try &.as_s
+
+    description = microformat.dig?("description", "simpleText").try &.as_s
+    description ||= description_txt || ""
+
     short_description = player_response.dig?("videoDetails", "shortDescription")
+    short_description ||= description_txt.try { |d| JSON::Any.new(d) }
 
     # description_html = video_secondary_renderer.try &.dig?("description", "runs")
     #  .try &.as_a.try { |t| content_to_comment_html(t, video_id) }
@@ -400,6 +462,9 @@ module Invidious::Videos::Parser
     ucid = video_details["channelId"]?.try &.as_s
 
     if author_info = video_secondary_renderer.try &.dig?("owner", "videoOwnerRenderer")
+      author ||= extract_text(author_info["title"]?)
+      ucid ||= author_info.dig?("navigationEndpoint", "browseEndpoint", "browseId").try &.as_s
+
       author_thumbnail = author_info.dig?("thumbnail", "thumbnails", 0, "url")
       author_verified = has_verified_badge?(author_info["badges"]?)
 
@@ -457,6 +522,26 @@ module Invidious::Videos::Parser
     }
 
     return params
+  end
+
+  # Parse the "dateText" of the /next response, e.g. "Aug 4, 2022",
+  # "Premiered Aug 4, 2022" or "Streamed live on Aug 4, 2022".
+  private def parse_date_text(date_text : JSON::Any?) : Time?
+    text = extract_text(date_text)
+    return nil if text.nil?
+
+    match = text.match(/([A-Z][a-z]+) (\d{1,2}), (\d{4})/)
+    return nil if match.nil?
+
+    {"%b %-d, %Y", "%B %-d, %Y"}.each do |format|
+      begin
+        return Time.parse(match[0], format, Time::Location::UTC)
+      rescue Time::Format::Error
+        next
+      end
+    end
+
+    return nil
   end
 
   private def convert_url(fmt)

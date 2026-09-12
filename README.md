@@ -60,6 +60,11 @@
 > removed. Everything else (search, channels, playlists, subscriptions,
 > comments, the JSON API for metadata) works as in upstream Invidious.
 > The goal is a lighter instance that uses far less bandwidth.
+>
+> Watch pages are built from YouTube's `/next` endpoint, which needs no PO
+> token, so **Invidious companion is optional**: when configured it only adds
+> extras (exact length, captions list, region flags, stream URLs in the JSON
+> API) and is ignored whenever YouTube answers it with a bot check.
 
 
 ## Screenshots

@@ -44,6 +44,8 @@ services:
         domain: ${INVIDIOUS_DOMAIN}
         https_only: true
         hmac_key: ${SERVICE_PASSWORD_64_HMAC}
+        # Optional: remove these two settings and the `companion` service
+        # below to run without Invidious companion. See its comment.
         invidious_companion:
           - private_url: "http://companion:8282/companion"
         invidious_companion_key: ${COMPANION_SECRET_KEY}
@@ -66,9 +68,12 @@ services:
       companion:
         condition: service_started
 
-  # Still required: this fork only ever asks the companion for the
-  # /youtubei/v1/player *metadata* (title, description, captions, etc).
-  # No media is requested through it, so its bandwidth use is negligible.
+  # OPTIONAL. Watch pages are built from YouTube's /next endpoint and work
+  # without the companion. When present, its player response only adds
+  # extras (exact length, caption list, region flags, stream URLs in the
+  # JSON API), and is ignored when YouTube answers with a bot check. If
+  # you cannot get PO tokens to work, delete this service and the two
+  # invidious_companion settings above.
   companion:
     image: quay.io/invidious/invidious-companion:latest
     restart: unless-stopped
