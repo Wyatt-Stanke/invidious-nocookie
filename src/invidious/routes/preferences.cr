@@ -26,10 +26,6 @@ module Invidious::Routes::PreferencesRoute
     annotations_subscribed ||= "off"
     annotations_subscribed = annotations_subscribed == "on"
 
-    preload = env.params.body["preload"]?.try &.as(String)
-    preload ||= "off"
-    preload = preload == "on"
-
     autoplay = env.params.body["autoplay"]?.try &.as(String)
     autoplay ||= "off"
     autoplay = autoplay == "on"
@@ -42,44 +38,13 @@ module Invidious::Routes::PreferencesRoute
     continue_autoplay ||= "off"
     continue_autoplay = continue_autoplay == "on"
 
-    listen = env.params.body["listen"]?.try &.as(String)
-    listen ||= "off"
-    listen = listen == "on"
-
-    local = env.params.body["local"]?.try &.as(String)
-    local ||= "off"
-    local = local == "on"
-
     watch_history = env.params.body["watch_history"]?.try &.as(String)
     watch_history ||= "off"
     watch_history = watch_history == "on"
 
-    speed = env.params.body["speed"]?.try &.as(String).to_f32?
-    speed ||= CONFIG.default_user_preferences.speed
-
-    player_style = env.params.body["player_style"]?.try &.as(String)
-    player_style ||= CONFIG.default_user_preferences.player_style
-
-    quality = env.params.body["quality"]?.try &.as(String)
-    quality ||= CONFIG.default_user_preferences.quality
-
-    quality_dash = env.params.body["quality_dash"]?.try &.as(String)
-    quality_dash ||= CONFIG.default_user_preferences.quality_dash
-
-    volume = env.params.body["volume"]?.try &.as(String).to_i?
-    volume ||= CONFIG.default_user_preferences.volume
-
     extend_desc = env.params.body["extend_desc"]?.try &.as(String)
     extend_desc ||= "off"
     extend_desc = extend_desc == "on"
-
-    vr_mode = env.params.body["vr_mode"]?.try &.as(String)
-    vr_mode ||= "off"
-    vr_mode = vr_mode == "on"
-
-    save_player_pos = env.params.body["save_player_pos"]?.try &.as(String)
-    save_player_pos ||= "off"
-    save_player_pos = save_player_pos == "on"
 
     show_nick = env.params.body["show_nick"]?.try &.as(String)
     show_nick ||= "off"
@@ -153,7 +118,6 @@ module Invidious::Routes::PreferencesRoute
     preferences = Preferences.from_json({
       annotations:                 annotations,
       annotations_subscribed:      annotations_subscribed,
-      preload:                     preload,
       autoplay:                    autoplay,
       captions:                    captions,
       comments:                    comments,
@@ -161,30 +125,21 @@ module Invidious::Routes::PreferencesRoute
       continue_autoplay:           continue_autoplay,
       dark_mode:                   dark_mode,
       latest_only:                 latest_only,
-      listen:                      listen,
-      local:                       local,
       watch_history:               watch_history,
       locale:                      locale,
       max_results:                 max_results,
       notifications_only:          notifications_only,
-      player_style:                player_style,
-      quality:                     quality,
-      quality_dash:                quality_dash,
       default_home:                default_home,
       feed_menu:                   feed_menu,
       automatic_instance_redirect: automatic_instance_redirect,
       region:                      region,
       related_videos:              related_videos,
       sort:                        sort,
-      speed:                       speed,
       thin_mode:                   thin_mode,
       unseen_only:                 unseen_only,
       video_loop:                  video_loop,
-      volume:                      volume,
       extend_desc:                 extend_desc,
-      vr_mode:                     vr_mode,
       show_nick:                   show_nick,
-      save_player_pos:             save_player_pos,
       default_playlist:            default_playlist,
       search_privacy:              search_privacy,
     }.to_json)

@@ -52,6 +52,15 @@
   </a>
 </div>
 
+> [!NOTE]
+> **This fork does not stream video.** Playback is delegated to an embedded
+> `youtube-nocookie.com` iframe, and every media-proxying code path from
+> upstream Invidious (`/videoplayback`, `/latest_version`, DASH/HLS manifests,
+> downloads, the "proxy videos" preference and the video.js player) has been
+> removed. Everything else (search, channels, playlists, subscriptions,
+> comments, the JSON API for metadata) works as in upstream Invidious.
+> The goal is a lighter instance that uses far less bandwidth.
+
 
 ## Screenshots
 

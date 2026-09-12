@@ -48,7 +48,6 @@ module Invidious::Routes::Watch
     subscriptions ||= [] of String
 
     params = Invidious::Videos.process_video_params(env.params.query, preferences)
-    env.params.query.delete_all("listen")
 
     begin
       video = get_video(id, region: params.region)
@@ -117,36 +116,9 @@ module Invidious::Routes::Watch
       comment_html ||= ""
     end
 
-    fmt_stream = video.fmt_stream
-    adaptive_fmts = video.adaptive_fmts
-
-    if params.local
-      fmt_stream.each { |fmt| fmt["url"] = JSON::Any.new(HttpServer::Utils.proxy_video_url(fmt["url"].as_s)) }
-    end
-
-    # Always proxy DASH streams, otherwise youtube CORS headers will prevent playback
-    adaptive_fmts.each { |fmt| fmt["url"] = JSON::Any.new(HttpServer::Utils.proxy_video_url(fmt["url"].as_s)) }
-
-    video_streams = video.video_streams
-    audio_streams = video.audio_streams
-
-    # Videos that are a premiere do not have audio streams.
-    if video.premiere_timestamp.nil?
-      # Older videos may not have audio sources available.
-      # We redirect here so they're not unplayable
-      if audio_streams.empty? && !video.live_now
-        if params.quality == "dash"
-          env.params.query.delete_all("quality")
-          env.params.query["quality"] = "medium"
-          return env.redirect "/watch?#{env.params.query}"
-        elsif params.listen
-          env.params.query.delete_all("listen")
-          env.params.query["listen"] = "0"
-          return env.redirect "/watch?#{env.params.query}"
-        end
-      end
-    end
-
+    # Playback is handled by an embedded youtube-nocookie.com player,
+    # so no stream URLs are resolved or proxied here. Only the caption
+    # preferences are computed, so the embed can preselect a track.
     captions = video.captions
 
     preferred_captions = captions.select { |caption|
@@ -157,47 +129,8 @@ module Invidious::Routes::Watch
       (params.preferred_captions.index(caption.name) ||
         params.preferred_captions.index(caption.language_code.split("-")[0])).not_nil!
     }
-    captions = captions - preferred_captions
-
-    aspect_ratio = "16:9"
 
     thumbnail = "/vi/#{video.id}/maxres.jpg"
-
-    if params.raw
-      if params.listen
-        url = audio_streams[0]["url"].as_s
-
-        if params.quality.ends_with? "k"
-          audio_streams.each do |fmt|
-            if fmt["bitrate"].as_i == params.quality.rchop("k").to_i
-              url = fmt["url"].as_s
-            end
-          end
-        end
-      else
-        url = fmt_stream[0]["url"].as_s
-
-        fmt_stream.each do |fmt|
-          if fmt["quality"].as_s == params.quality
-            url = fmt["url"].as_s
-          end
-        end
-      end
-
-      return env.redirect url
-    end
-
-    # Structure used for the download widget
-    video_assets = Invidious::Frontend::WatchPage::VideoAssets.new(
-      full_videos: fmt_stream,
-      video_streams: video_streams,
-      audio_streams: audio_streams,
-      captions: video.captions
-    )
-
-    if CONFIG.invidious_companion.present?
-      invidious_companion = CONFIG.invidious_companion.sample
-    end
 
     templated "watch"
   end
@@ -285,54 +218,6 @@ module Invidious::Routes::Watch
       return env.redirect "/watch?v=#{video_id}&#{env.params.query}"
     else
       return error_template(404, "The requested clip doesn't exist")
-    end
-  end
-
-  def self.download(env)
-    if CONFIG.disabled?("downloads")
-      return error_template(403, "Administrator has disabled this endpoint.")
-    end
-    if CONFIG.invidious_companion.present?
-      return error_template(403, "Downloads should be routed through Companion when present")
-    end
-
-    title = env.params.body["title"]? || ""
-    video_id = env.params.body["id"]? || ""
-    selection = env.params.body["download_widget"]?
-
-    if title.empty? || video_id.empty? || selection.nil?
-      return error_template(400, "Missing form data")
-    end
-
-    download_widget = JSON.parse(selection)
-
-    extension = download_widget["ext"].as_s
-    filename = "#{title}-#{video_id}.#{extension}"
-
-    # Delete the now useless URL parameters
-    env.params.body.delete("id")
-    env.params.body.delete("title")
-    env.params.body.delete("download_widget")
-
-    # Pass form parameters as URL parameters for the handlers of both
-    # /latest_version and /api/v1/captions. This avoids an un-necessary
-    # redirect and duplicated (and hazardous) sanity checks.
-    if label = download_widget["label"]?
-      # URL params specific to /api/v1/captions/:id
-      env.params.url["id"] = video_id
-      env.params.query["title"] = filename
-      env.params.query["label"] = URI.decode_www_form(label.as_s)
-
-      return Invidious::Routes::API::V1::Videos.captions(env)
-    elsif itag = download_widget["itag"]?.try &.as_i.to_s
-      # URL params specific to /latest_version
-      env.params.query["id"] = video_id
-      env.params.query["title"] = filename
-      env.params.query["local"] = "true"
-
-      return Invidious::Routes::VideoPlayback.latest_version(env)
-    else
-      return error_template(400, "Invalid label or itag")
     end
   end
 end

@@ -12,10 +12,6 @@
                 <input name="video_loop" id="video_loop" type="checkbox" <% if preferences.video_loop %>checked<% end %>>
             </div>
 
-            <div class="pure-control-group">
-                <label for="preload"><%= I18n.translate(locale, "preferences_preload_label") %></label>
-                <input name="preload" id="preload" type="checkbox" <% if preferences.preload %>checked<% end %>>
-            </div>
 
             <div class="pure-control-group">
                 <label for="autoplay"><%= I18n.translate(locale, "preferences_autoplay_label") %></label>
@@ -32,52 +28,11 @@
                 <input name="continue_autoplay" id="continue_autoplay" type="checkbox" <% if preferences.continue_autoplay %>checked<% end %>>
             </div>
 
-            <div class="pure-control-group">
-                <label for="local"><%= I18n.translate(locale, "preferences_local_label") %></label>
-                <input name="local" id="local" type="checkbox" <% if preferences.local && !CONFIG.disabled?("local") %>checked<% end %> <% if CONFIG.disabled?("local") %>disabled<% end %>>
-            </div>
 
-            <div class="pure-control-group">
-                <label for="listen"><%= I18n.translate(locale, "preferences_listen_label") %></label>
-                <input name="listen" id="listen" type="checkbox" <% if preferences.listen %>checked<% end %>>
-            </div>
 
-            <div class="pure-control-group">
-                <label for="speed"><%= I18n.translate(locale, "preferences_speed_label") %></label>
-                <select name="speed" id="speed">
-                    <% {2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25}.each do |option| %>
-                        <option <% if preferences.speed == option %> selected <% end %>><%= option %></option>
-                    <% end %>
-                </select>
-            </div>
 
-            <div class="pure-control-group">
-                <label for="quality"><%= I18n.translate(locale, "preferences_quality_label") %></label>
-                <select name="quality" id="quality">
-                    <% {"dash", "hd720", "medium", "small"}.each do |option| %>
-                        <% if !(option == "dash" && CONFIG.disabled?("dash")) %>
-                            <option value="<%= option %>" <% if preferences.quality == option %> selected <% end %>><%= I18n.translate(locale, "preferences_quality_option_" + option) %></option>
-                        <% end %>
-                    <% end %>
-                </select>
-            </div>
 
-            <% if !CONFIG.disabled?("dash") %>
-                <div class="pure-control-group">
-                    <label for="quality_dash"><%= I18n.translate(locale, "preferences_quality_dash_label") %></label>
-                    <select name="quality_dash" id="quality_dash">
-                        <% {"auto", "best", "4320p", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p", "144p", "worst"}.each do |option| %>
-                            <option value="<%= option %>" <% if preferences.quality_dash == option %> selected <% end %>><%= I18n.translate(locale, "preferences_quality_dash_option_" + option) %></option>
-                        <% end %>
-                    </select>
-                </div>
-            <% end %>
 
-            <div class="pure-control-group">
-                <label for="volume"><%= I18n.translate(locale, "preferences_volume_label") %></label>
-                <input name="volume" id="volume" data-onrange="update_volume_value" type="range" min="0" max="100" step="5" value="<%= preferences.volume %>">
-                <span class="pure-form-message-inline" id="volume-value"><%= preferences.volume %></span>
-            </div>
 
             <div class="pure-control-group">
                 <label for="comments[0]"><%= I18n.translate(locale, "preferences_comments_label") %></label>
@@ -116,15 +71,7 @@
                 <input name="extend_desc" id="extend_desc" type="checkbox" <% if preferences.extend_desc %>checked<% end %>>
             </div>
 
-            <div class="pure-control-group">
-                <label for="vr_mode"><%= I18n.translate(locale, "preferences_vr_mode_label") %></label>
-                <input name="vr_mode" id="vr_mode" type="checkbox" <% if preferences.vr_mode %>checked<% end %>>
-            </div>
 
-            <div class="pure-control-group">
-                <label for="save_player_pos"><%= I18n.translate(locale, "preferences_save_player_pos_label") %></label>
-                <input name="save_player_pos" id="save_player_pos" type="checkbox" <% if preferences.save_player_pos %>checked<% end %>>
-            </div>
 
             <% if user = env.get?("user").try &.as(User) %>
                 <% playlists = Invidious::Database::Playlists.select_user_created_playlists(user.email) %>
@@ -159,14 +106,6 @@
                 </select>
             </div>
 
-            <div class="pure-control-group">
-                <label for="player_style"><%= I18n.translate(locale, "preferences_player_style_label") %></label>
-                <select name="player_style" id="player_style">
-                    <% {"invidious", "youtube"}.each do |option| %>
-                        <option value="<%= option %>" <% if preferences.player_style == option %> selected <% end %>><%= I18n.translate(locale, option) %></option>
-                    <% end %>
-                </select>
-            </div>
 
             <div class="pure-control-group">
                 <label for="dark_mode"><%= I18n.translate(locale, "preferences_dark_mode_label") %></label>

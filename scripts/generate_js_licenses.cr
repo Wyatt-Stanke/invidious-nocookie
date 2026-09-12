@@ -8,16 +8,7 @@
 # for example just reiterates the name of the source file rather than use a "source" string.
 all_javascript_files = Dir.glob("assets/**/*.js")
 
-videojs_js = [] of String
-invidious_js = [] of String
-
-all_javascript_files.each do |js_path|
-  if js_path.starts_with?("assets/videojs/")
-    videojs_js << js_path[7..]
-  else
-    invidious_js << js_path[7..]
-  end
-end
+invidious_js = all_javascript_files.map { |js_path| js_path[7..] }
 
 def create_licence_tr(path, file_name, licence_name, licence_link, source_location)
   tr = <<-HTML
@@ -33,16 +24,13 @@ def create_licence_tr(path, file_name, licence_name, licence_link, source_locati
   tr.gsub('\n', "")
 end
 
-# TODO Use videojs-dependencies.yml to generate license info for videojs javascript
 jslicence_table_rows = [] of String
 
 invidious_js.each do |path|
   file_name = path.split('/')[-1]
 
   # A couple non Invidious JS files are also shipped alongside Invidious due to various reasons
-  next if {
-            "sse.js", "silvermine-videojs-quality-selector.min.js", "videojs-youtube-annotations.min.js",
-          }.includes?(file_name)
+  next if {"sse.js"}.includes?(file_name)
 
   jslicence_table_rows << create_licence_tr(
     path: path,

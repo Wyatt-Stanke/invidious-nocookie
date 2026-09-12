@@ -307,24 +307,6 @@ def subscribe_pubsub(topic, key)
   return make_client(PUBSUB_URL, &.post("/subscribe", form: body))
 end
 
-def parse_range(range)
-  if !range
-    return 0_i64, nil
-  end
-
-  ranges = range.lchop("bytes=").split(',')
-  ranges.each do |r|
-    start_range, end_range = r.split('-')
-
-    start_range = start_range.to_i64? || 0_i64
-    end_range = end_range.to_i64?
-
-    return start_range, end_range
-  end
-
-  return 0_i64, nil
-end
-
 def reduce_uri(uri : URI | String, max_length : Int32 = 50, suffix : String = "…") : String
   str = uri.to_s.sub(/^https?:\/\//, "")
   if str.size > max_length

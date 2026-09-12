@@ -156,30 +156,8 @@ module Invidious::Routes::Embed
       notifications.delete(id)
     end
 
-    fmt_stream = video.fmt_stream
-    adaptive_fmts = video.adaptive_fmts
-
-    if params.local
-      fmt_stream.each { |fmt| fmt["url"] = JSON::Any.new(HttpServer::Utils.proxy_video_url(fmt["url"].as_s)) }
-    end
-
-    # Always proxy DASH streams, otherwise youtube CORS headers will prevent playback
-    adaptive_fmts.each { |fmt| fmt["url"] = JSON::Any.new(HttpServer::Utils.proxy_video_url(fmt["url"].as_s)) }
-
-    video_streams = video.video_streams
-    audio_streams = video.audio_streams
-
-    if audio_streams.empty? && !video.live_now
-      if params.quality == "dash"
-        env.params.query.delete_all("quality")
-        return env.redirect "/embed/#{id}?#{env.params.query}"
-      elsif params.listen
-        env.params.query.delete_all("listen")
-        env.params.query["listen"] = "0"
-        return env.redirect "/embed/#{id}?#{env.params.query}"
-      end
-    end
-
+    # Playback is handled by an embedded youtube-nocookie.com player,
+    # so no stream URLs are resolved or proxied here.
     captions = video.captions
 
     preferred_captions = captions.select { |caption|
@@ -190,25 +168,8 @@ module Invidious::Routes::Embed
       (params.preferred_captions.index(caption.name) ||
         params.preferred_captions.index(caption.language_code.split("-")[0])).not_nil!
     }
-    captions = captions - preferred_captions
-
-    aspect_ratio = nil
 
     thumbnail = "/vi/#{video.id}/maxres.jpg"
-
-    if params.raw
-      url = fmt_stream[0]["url"].as_s
-
-      fmt_stream.each do |fmt|
-        url = fmt["url"].as_s if fmt["quality"].as_s == params.quality
-      end
-
-      return env.redirect url
-    end
-
-    if CONFIG.invidious_companion.present?
-      invidious_companion = CONFIG.invidious_companion.sample
-    end
 
     rendered "embed"
   end

@@ -44,8 +44,6 @@ module Invidious::Routing
 
     self.register_image_routes
     self.register_api_v1_routes
-    self.register_api_manifest_routes
-    self.register_video_playback_routes
     self.register_companion_routes
   end
 
@@ -169,8 +167,6 @@ module Invidious::Routing
     get "/v/:id", Routes::Watch, :redirect
     get "/e/:id", Routes::Watch, :redirect
 
-    post "/download", Routes::Watch, :download
-
     get "/embed/", Routes::Embed, :redirect
     get "/embed/:id", Routes::Embed, :show
   end
@@ -192,29 +188,11 @@ module Invidious::Routing
   # -------------------
   #  Proxy routes
   # -------------------
-
-  def register_api_manifest_routes
-    get "/api/manifest/dash/id/:id", Routes::API::Manifest, :get_dash_video_id
-
-    get "/api/manifest/dash/id/videoplayback", Routes::API::Manifest, :get_dash_video_playback
-    get "/api/manifest/dash/id/videoplayback/*", Routes::API::Manifest, :get_dash_video_playback_greedy
-
-    options "/api/manifest/dash/id/videoplayback", Routes::API::Manifest, :options_dash_video_playback
-    options "/api/manifest/dash/id/videoplayback/*", Routes::API::Manifest, :options_dash_video_playback
-
-    get "/api/manifest/hls_playlist/*", Routes::API::Manifest, :get_hls_playlist
-    get "/api/manifest/hls_variant/*", Routes::API::Manifest, :get_hls_variant
-  end
-
-  def register_video_playback_routes
-    get "/videoplayback", Routes::VideoPlayback, :get_video_playback
-    get "/videoplayback/*", Routes::VideoPlayback, :get_video_playback_greedy
-
-    options "/videoplayback", Routes::VideoPlayback, :options_video_playback
-    options "/videoplayback/*", Routes::VideoPlayback, :options_video_playback
-
-    get "/latest_version", Routes::VideoPlayback, :latest_version
-  end
+  #
+  # NOTE: this fork does not proxy or serve any video/audio data.
+  # Playback is delegated to an embedded youtube-nocookie.com player,
+  # so the /videoplayback, /latest_version and /api/manifest/* routes
+  # have been removed on purpose. Only image proxying remains.
 
   def register_image_routes
     get "/ggpht/*", Routes::Images, :ggpht

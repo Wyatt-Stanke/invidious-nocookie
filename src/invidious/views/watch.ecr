@@ -27,7 +27,7 @@
 <meta name="twitter:player:width" content="1280">
 <meta name="twitter:player:height" content="720">
 <link rel="alternate" href="https://www.youtube.com/watch?v=<%= video.id %>">
-<%= rendered "components/player_sources" %>
+<link rel="stylesheet" href="/css/player.css?v=<%= ASSET_COMMIT %>">
 <title><%= title %> - Invidious</title>
 
 <!-- Description expansion also updates the 'Show more' button to 'Show less' so
@@ -70,23 +70,11 @@ we're going to need to do it here in order to allow for translations.
     "params" => params,
     "preferences" => preferences,
     "premiere_timestamp" => video.premiere_timestamp.try &.to_unix,
-    "vr" => video.vr?,
     "comments_enabled" => video.comments?,
-    "projection_type" => video.projection_type,
-    "local_disabled" => CONFIG.disabled?("local"),
-    "support_reddit" => true,
-    "live_now" => video.live_now
+    "support_reddit" => true
 }.to_pretty_json
 %>
 </script>
-<script id="config" type="application/json">
-<%=
-{
-    "videojs" => CONFIG.videojs,
-}.to_pretty_json
-%>
-</script>
-
 <div id="player-container" class="h-box">
     <%= rendered "components/player" %>
 </div>
@@ -94,15 +82,6 @@ we're going to need to do it here in order to allow for translations.
 <div class="h-box">
     <h1>
         <%= title %>
-        <% if params.listen %>
-            <a title="<%=I18n.translate(locale, "Video mode")%>" id="link-iv-listen" data-base-url="/watch?<%= env.params.query %>&listen=0" href="/watch?<%= env.params.query %>&listen=0">
-                <i class="icon ion-ios-videocam"></i>
-            </a>
-        <% else %>
-            <a title="<%=I18n.translate(locale, "Audio mode")%>" id="link-iv-listen" data-base-url="/watch?<%= env.params.query %>&listen=1" href="/watch?<%= env.params.query %>&listen=1">
-                <i class="icon ion-md-headset"></i>
-            </a>
-        <% end %>
     </h1>
 
     <% if !video.is_listed %>
@@ -201,8 +180,6 @@ we're going to need to do it here in order to allow for translations.
                     <script src="/js/playlist_widget.js?v=<%= Time.utc.to_unix_ms %>"></script>
                 <% end %>
             <% end %>
-
-            <%= Invidious::Frontend::WatchPage.download_widget(locale, video, video_assets) %>
 
             <p id="views"><i class="icon ion-ios-eye"></i> <%= number_with_separator(video.views) %></p>
             <p id="likes"><i class="icon ion-ios-thumbs-up"></i> <%= number_with_separator(video.likes) %></p>
@@ -369,7 +346,7 @@ we're going to need to do it here in order to allow for translations.
 
                             <div class="thumbnail">
                                 <%- if !env.get("preferences").as(Preferences).thin_mode -%>
-                                    <a tabindex="-1" href="/watch?v=<%= rv["id"] %>&listen=<%= params.listen %>">
+                                    <a tabindex="-1" href="/watch?v=<%= rv["id"] %>">
                                         <img loading="lazy" class="thumbnail" src="/vi/<%= rv["id"] %>/mqdefault.jpg" alt="" />
                                     </a>
                                 <%- else -%>
@@ -384,7 +361,7 @@ we're going to need to do it here in order to allow for translations.
                             </div>
 
                             <div class="video-card-row">
-                                <a href="/watch?v=<%= rv["id"] %>&listen=<%= params.listen %>"><p dir="auto"><%= HTML.escape(rv["title"]) %></p></a>
+                                <a href="/watch?v=<%= rv["id"] %>"><p dir="auto"><%= HTML.escape(rv["title"]) %></p></a>
                             </div>
 
                             <h5 class="pure-g">

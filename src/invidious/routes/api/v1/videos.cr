@@ -11,8 +11,6 @@ module Invidious::Routes::API::V1::Videos
 
     id = env.params.url["id"]
     region = env.params.query["region"]?
-    proxy = {"1", "true"}.any? &.== env.params.query["local"]?
-
     begin
       video = get_video(id, region: region)
     rescue ex : NotFoundException
@@ -22,7 +20,7 @@ module Invidious::Routes::API::V1::Videos
     end
 
     return JSON.build do |json|
-      Invidious::JSONify::APIv1.video(video, json, locale: locale, proxy: proxy)
+      Invidious::JSONify::APIv1.video(video, json, locale: locale)
     end
   end
 
@@ -397,8 +395,6 @@ module Invidious::Routes::API::V1::Videos
 
     clip_id = env.params.url["id"]
     region = env.params.query["region"]?
-    proxy = {"1", "true"}.any? &.== env.params.query["local"]?
-
     response = YoutubeAPI.resolve_url("https://www.youtube.com/clip/#{clip_id}")
     return error_json(400, "Invalid clip ID") if response["error"]?
 
@@ -427,7 +423,7 @@ module Invidious::Routes::API::V1::Videos
         json.field "endTime", end_time
         json.field "clipTitle", clip_title
         json.field "video" do
-          Invidious::JSONify::APIv1.video(video, json, locale: locale, proxy: proxy)
+          Invidious::JSONify::APIv1.video(video, json, locale: locale)
         end
       end
     end

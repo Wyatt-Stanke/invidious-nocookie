@@ -3,7 +3,7 @@ require "json"
 module Invidious::JSONify::APIv1
   extend self
 
-  def video(video : Video, json : JSON::Builder, *, locale : String?, proxy : Bool = false)
+  def video(video : Video, json : JSON::Builder, *, locale : String?)
     json.object do
       json.field "type", video.video_type
 
@@ -69,12 +69,11 @@ module Invidious::JSONify::APIv1
         json.field "premiereTimestamp", video.premiere_timestamp.try &.to_unix
       end
 
+      # NOTE: this fork never proxies media. Stream URLs below point
+      # straight at YouTube's servers and are provided for API clients only.
       if hlsvp = video.hls_manifest_url
-        hlsvp = hlsvp.gsub("https://manifest.googlevideo.com", HOST_URL)
         json.field "hlsUrl", hlsvp
       end
-
-      json.field "dashUrl", "#{HOST_URL}/api/manifest/dash/id/#{video.id}"
 
       json.field "adaptiveFormats" do
         json.array do
@@ -91,13 +90,7 @@ module Invidious::JSONify::APIv1
               # Not available on MPEG-4 Timed Text (`text/mp4`) streams (livestreams only)
               json.field "bitrate", fmt["bitrate"].as_i.to_s if fmt["bitrate"]?
 
-              if proxy
-                json.field "url", Invidious::HttpServer::Utils.proxy_video_url(
-                  fmt["url"].to_s, absolute: true
-                )
-              else
-                json.field "url", fmt["url"]
-              end
+              json.field "url", fmt["url"]
 
               json.field "itag", fmt["itag"].as_i.to_s
               json.field "type", fmt["mimeType"]
@@ -162,13 +155,7 @@ module Invidious::JSONify::APIv1
         json.array do
           video.fmt_stream.each do |fmt|
             json.object do
-              if proxy
-                json.field "url", Invidious::HttpServer::Utils.proxy_video_url(
-                  fmt["url"].to_s, absolute: true
-                )
-              else
-                json.field "url", fmt["url"]
-              end
+              json.field "url", fmt["url"]
               json.field "itag", fmt["itag"].as_i.to_s
               json.field "type", fmt["mimeType"]
               json.field "quality", fmt["quality"]

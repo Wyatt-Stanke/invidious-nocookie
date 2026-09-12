@@ -20,7 +20,6 @@ struct ConfigPreferences
 
   property annotations : Bool = false
   property annotations_subscribed : Bool = false
-  property preload : Bool = true
   property autoplay : Bool = false
   property captions : Array(String) = ["", "", ""]
   property comments : Array(String) = ["youtube", ""]
@@ -28,30 +27,21 @@ struct ConfigPreferences
   property continue_autoplay : Bool = true
   property dark_mode : String = ""
   property latest_only : Bool = false
-  property listen : Bool = false
-  property local : Bool = false
   property locale : String = "en-US"
   property watch_history : Bool = true
   property max_results : Int32 = 40
   property notifications_only : Bool = false
-  property player_style : String = "invidious"
-  property quality : String = "dash"
-  property quality_dash : String = "auto"
   property default_home : String? = "Popular"
   property feed_menu : Array(String) = ["Popular", "Trending", "Subscriptions", "Playlists"]
   property automatic_instance_redirect : Bool = false
   property region : String = "US"
   property related_videos : Bool = true
   property sort : String = "published"
-  property speed : Float32 = 1.0_f32
   property thin_mode : Bool = false
   property unseen_only : Bool = false
   property video_loop : Bool = false
   property extend_desc : Bool = false
-  property volume : Int32 = 100
-  property vr_mode : Bool = true
   property show_nick : Bool = true
-  property save_player_pos : Bool = false
   @[YAML::Field(ignore: true)]
   property default_playlist : String? = nil
   property search_privacy : Bool = false
@@ -139,8 +129,6 @@ class Config
   property admins : Array(String) = [] of String
   property external_port : Int32? = nil
   property default_user_preferences : ConfigPreferences = ConfigPreferences.from_yaml("")
-  # For compliance with DMCA, disables download widget using list of video IDs
-  property dmca_content : Array(String) = [] of String
   # Check table integrity, automatically try to add any missing columns, create tables, etc.
   property check_tables : Bool = false
   # Cache annotations requested from IA, will not cache empty annotations or annotations that only contain cards
@@ -149,8 +137,6 @@ class Config
   property banner : String? = nil
   # Enables 'Strict-Transport-Security'. Ensure that `domain` and all subdomains are served securely
   property hsts : Bool? = true
-  # Disable proxying server-wide: options: 'dash', 'livestreams', 'downloads', 'local'
-  property disable_proxy : Bool? | Array(String)? = false
   # Enable the user notifications for all users
   property enable_user_notifications : Bool = true
 
@@ -191,34 +177,6 @@ class Config
 
   # Disable easy to abuse API endpoints
   property disable_abusable_api : Bool = false
-
-  property videojs : VideoJSConfig = VideoJSConfig.from_yaml("")
-
-  struct VideoJSConfig
-    include YAML::Serializable
-    include JSON::Serializable
-
-    # This are the default values that VideoJS uses.
-    # See `assets/videojs/video.js/video.js` file
-    # and search for `GOAL_BUFFER_LENGTH` and `MAX_GOAL_BUFFER_LENGTH`
-    property goal_buffer_length : Int32? = 30
-    property max_goal_buffer_length : Int32? = 60
-  end
-
-  def disabled?(option)
-    case disabled = CONFIG.disable_proxy
-    when Bool
-      return disabled
-    when Array
-      if disabled.includes? option
-        return true
-      else
-        return false
-      end
-    else
-      return false
-    end
-  end
 
   def self.load
     # Load config from file or YAML string env var

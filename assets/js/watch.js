@@ -31,12 +31,6 @@ function next_video() {
 
     if (video_data.params.autoplay || video_data.params.continue_autoplay)
         url.searchParams.set('autoplay', '1');
-    if (video_data.params.listen !== video_data.preferences.listen)
-        url.searchParams.set('listen', video_data.params.listen);
-    if (video_data.params.speed !== video_data.preferences.speed)
-        url.searchParams.set('speed', video_data.params.speed);
-    if (video_data.params.local !== video_data.preferences.local)
-        url.searchParams.set('local', video_data.params.local);
     url.searchParams.set('continue', '1');
 
     location.assign(url.pathname + url.search);
@@ -67,10 +61,6 @@ function get_playlist(plid) {
             '&format=html&hl=' + video_data.preferences.locale;
     }
 
-    if (video_data.params.listen) {
-        plid_url += '&listen=1'
-    }
-
     helpers.xhr('GET', plid_url, {retries: 5, entity_name: 'playlist'}, {
         on200: function (response) {
             playlist.innerHTML = response.playlistHtml;
@@ -88,12 +78,6 @@ function get_playlist(plid) {
                     url.searchParams.set('index', response.index);
                 if (video_data.params.autoplay || video_data.params.continue_autoplay)
                     url.searchParams.set('autoplay', '1');
-                if (video_data.params.listen !== video_data.preferences.listen)
-                    url.searchParams.set('listen', video_data.params.listen);
-                if (video_data.params.speed !== video_data.preferences.speed)
-                    url.searchParams.set('speed', video_data.params.speed);
-                if (video_data.params.local !== video_data.preferences.local)
-                    url.searchParams.set('local', video_data.params.local);
 
                 location.assign(url.pathname + url.search);
             });
@@ -166,12 +150,6 @@ if (video_data.play_next) {
 
         if (video_data.params.autoplay || video_data.params.continue_autoplay)
             url.searchParams.set('autoplay', '1');
-        if (video_data.params.listen !== video_data.preferences.listen)
-            url.searchParams.set('listen', video_data.params.listen);
-        if (video_data.params.speed !== video_data.preferences.speed)
-            url.searchParams.set('speed', video_data.params.speed);
-        if (video_data.params.local !== video_data.preferences.local)
-            url.searchParams.set('local', video_data.params.local);
         url.searchParams.set('continue', '1');
 
         location.assign(url.pathname + url.search);

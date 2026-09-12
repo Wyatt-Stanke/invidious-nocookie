@@ -37,10 +37,9 @@ COPY ./src/ ./src/
 # See definition of CURRENT_BRANCH, CURRENT_COMMIT and CURRENT_VERSION.
 COPY ./.git/ ./.git/
 
-# Required for fetching player dependencies
+# Required for generating the JS licenses page at compile time
 COPY ./scripts/ ./scripts/
 COPY ./assets/ ./assets/
-COPY ./videojs-dependencies.yml ./videojs-dependencies.yml
 
 RUN crystal spec --warnings all \
     --link-flags "-lxml2 -llzma"

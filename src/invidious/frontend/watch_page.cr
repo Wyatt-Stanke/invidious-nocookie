@@ -1,117 +1,54 @@
 module Invidious::Frontend::WatchPage
   extend self
 
-  # A handy structure to pass many elements at
-  # once to the download widget function
-  struct VideoAssets
-    getter full_videos : Array(Hash(String, JSON::Any))
-    getter video_streams : Array(Hash(String, JSON::Any))
-    getter audio_streams : Array(Hash(String, JSON::Any))
-    getter captions : Array(Invidious::Videos::Captions::Metadata)
+  # Origin of the privacy-enhanced YouTube embed used for all playback.
+  EMBED_ORIGIN = "https://www.youtube-nocookie.com"
 
-    def initialize(
-      @full_videos,
-      @video_streams,
-      @audio_streams,
-      @captions,
-    )
+  # Build the URL of the youtube-nocookie.com iframe for a given video.
+  #
+  # Every player-related preference that has an equivalent embed parameter
+  # is mapped here. See: https://developers.google.com/youtube/player_parameters
+  def embed_player_url(
+    video : Video,
+    params : Invidious::Videos::VideoPreferences,
+    preferred_captions : Array(Invidious::Videos::Captions::Metadata),
+    locale : String,
+  ) : String
+    query = URI::Params.new
+
+    # Needed so the parent page can receive player events (e.g. "ended")
+    # over postMessage without loading any third-party script.
+    query["enablejsapi"] = "1"
+    query["origin"] = HOST_URL if !HOST_URL.empty?
+
+    query["autoplay"] = "1" if params.autoplay
+    query["controls"] = "0" if !params.controls
+    query["playsinline"] = "1"
+
+    # Do not let YouTube suggest videos from other channels at the end,
+    # Invidious already provides its own "related videos" sidebar.
+    query["rel"] = "0"
+
+    if params.video_loop
+      # YouTube only loops single videos when they are given as a playlist
+      query["loop"] = "1"
+      query["playlist"] = video.id
     end
-  end
 
-  def download_widget(locale : String, video : Video, video_assets : VideoAssets) : String
-    if CONFIG.disabled?("downloads")
-      return "<p id=\"download\">#{I18n.translate(locale, "Download is disabled")}</p>"
+    video_start = params.video_start.to_i
+    video_end = params.video_end.to_i
+    query["start"] = video_start.to_s if video_start > 0
+    query["end"] = video_end.to_s if video_end > 0
+
+    query["iv_load_policy"] = params.annotations ? "1" : "3"
+
+    if caption = preferred_captions[0]?
+      query["cc_load_policy"] = "1"
+      query["cc_lang_pref"] = caption.language_code
     end
 
-    if CONFIG.dmca_content.includes?(video.id)
-      return "<p id=\"download\">#{I18n.translate(locale, "dmca_content")}</p>"
-    end
+    query["hl"] = locale
 
-    url = "/download"
-    if (CONFIG.invidious_companion.present?)
-      invidious_companion = CONFIG.invidious_companion.sample
-      url = "#{invidious_companion.public_url}/download?check=#{invidious_companion_encrypt(video.id)}"
-    end
-
-    return String.build(4000) do |str|
-      str << "<form"
-      str << " class=\"pure-form pure-form-stacked\""
-      str << " action='" << HTML.escape(url) << "'"
-      str << " method='post'"
-      str << " rel='noopener noreferrer'"
-      str << " target='_blank'>"
-      str << '\n'
-
-      # Hidden inputs for video id and title
-      str << "<input type='hidden' name='id' value='" << video.id << "'/>\n"
-      str << "<input type='hidden' name='title' value='" << HTML.escape(video.title) << "'/>\n"
-
-      str << "\t<div class=\"pure-control-group\">\n"
-
-      str << "\t\t<label for='download_widget'>"
-      str << I18n.translate(locale, "Download as: ")
-      str << "</label>\n"
-
-      str << "\t\t<select name='download_widget' id='download_widget'>\n"
-
-      # Non-DASH videos (audio+video)
-
-      video_assets.full_videos.each do |option|
-        mimetype = option["mimeType"].as_s.split(";")[0]
-
-        height = Invidious::Videos::Formats.itag_to_metadata?(option["itag"]).try &.["height"]?
-
-        value = {"itag": option["itag"], "ext": mimetype.split("/")[1]}.to_json
-
-        str << "\t\t\t<option value='" << value << "'>"
-        str << (height || "~240") << "p - " << mimetype
-        str << "</option>\n"
-      end
-
-      # DASH video streams
-
-      video_assets.video_streams.each do |option|
-        mimetype = option["mimeType"].as_s.split(";")[0]
-
-        value = {"itag": option["itag"], "ext": mimetype.split("/")[1]}.to_json
-
-        str << "\t\t\t<option value='" << value << "'>"
-        str << option["qualityLabel"] << " - " << mimetype << " @ " << option["fps"] << "fps - video only"
-        str << "</option>\n"
-      end
-
-      # DASH audio streams
-
-      video_assets.audio_streams.each do |option|
-        mimetype = option["mimeType"].as_s.split(";")[0]
-
-        value = {"itag": option["itag"], "ext": mimetype.split("/")[1]}.to_json
-
-        str << "\t\t\t<option value='" << value << "'>"
-        str << mimetype << " @ " << (option["bitrate"]?.try &.as_i./ 1000) << "k - audio only"
-        str << "</option>\n"
-      end
-
-      # Subtitles (a.k.a "closed captions")
-
-      video_assets.captions.each do |caption|
-        value = {"label": caption.name, "ext": "#{caption.language_code}.vtt"}.to_json
-
-        str << "\t\t\t<option value='" << value << "'>"
-        str << I18n.translate(locale, "download_subtitles", I18n.translate(locale, caption.name))
-        str << "</option>\n"
-      end
-
-      # End of form
-
-      str << "\t\t</select>\n"
-      str << "\t</div>\n"
-
-      str << "\t<button type=\"submit\" class=\"pure-button pure-button-primary\">\n"
-      str << "\t\t<b>" << I18n.translate(locale, "Download") << "</b>\n"
-      str << "\t</button>\n"
-
-      str << "</form>\n"
-    end
+    return "#{EMBED_ORIGIN}/embed/#{video.id}?#{query}"
   end
 end

@@ -53,7 +53,7 @@ module Invidious::Routes::BeforeAll
       "manifest-src 'self'",
       "media-src 'self' blob: " + COMPANION_CSP.companion_urls,
       "child-src 'self' blob:",
-      "frame-src 'self'",
+      "frame-src 'self' https://www.youtube-nocookie.com",
       "frame-ancestors " + frame_ancestors,
     }.join("; ")
 
@@ -73,10 +73,6 @@ module Invidious::Routes::BeforeAll
                 "/s_p/",
                 "/yts/",
                 "/ggpht/",
-                "/api/manifest/",
-                "/videoplayback",
-                "/latest_version",
-                "/download",
                 "/companion/",
               }.any? { |r| env.request.resource.starts_with? r }
 
@@ -116,21 +112,6 @@ module Invidious::Routes::BeforeAll
     preferences.thin_mode = thin_mode
     preferences.locale = locale
     env.set "preferences", preferences
-
-    # Allow media resources to be loaded from google servers
-    # TODO: check if *.youtube.com can be removed
-    #
-    # `!preferences.local` has to be checked after setting and
-    # reading `preferences` from the "PREFS" cookie and
-    # saved user preferences from the database, otherwise
-    # `https://*.googlevideo.com:443 https://*.youtube.com:443`
-    # will not be set in the CSP header if
-    # `default_user_preferences.local` is set to true on the
-    # configuration file, causing preference “Proxy Videos”
-    # not to work while having it disabled and using medium quality.
-    if CONFIG.disabled?("local") || !preferences.local
-      env.response.headers["Content-Security-Policy"] = env.response.headers["Content-Security-Policy"].gsub("media-src", "media-src https://*.googlevideo.com:443 https://*.youtube.com:443")
-    end
 
     current_page = env.request.path
     if env.request.query
